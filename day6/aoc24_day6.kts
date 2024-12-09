@@ -80,10 +80,12 @@ do  {
 println("Path length ${visited.map {it.first}.distinct().size}")
 
 val loopCreatorPositions = mutableListOf<Position>()
+val visitedDistinctPositions = visited.map {it.first}.distinct()
 
-for(i in 1..visited.lastIndex) {
+
+for(i in 1..visitedDistinctPositions.lastIndex) {
     // This runs for a pretty long time. There must be a better way to solve this, but no good idea right now
-    val newObstacle = visited[i].first
+    val newObstacle = visitedDistinctPositions[i]
     if (!loopCreatorPositions.contains(newObstacle)) {
         val newPath = mutableListOf(Position(startColumn, startRow) to startDirection)
         var direction = newPath.last().second
