@@ -1,5 +1,6 @@
 import kotlin.io.path.Path
 import kotlin.io.path.readLines
+import kotlin.math.min
 
 val smallMap = """
     ###############
@@ -72,53 +73,10 @@ data class Field(val x: Int, val y: Int) {
     }
 }
 
-data class PathStep(val field: Field, val direction: Direction, val score: Long) {
+data class PathStep(val field: Field, val direction: Direction, val score: Long, val visited: Set<Field>) {
     fun nextSteps(): List<PathStep> {
-        val nexts = field.reachable()
-        return nexts.map { PathStep(it.second, it.first, score + direction.turnScore(it.first)+1L) }
-    }
-}
-
-var shortest = Long.MAX_VALUE
-var pathCounter = 0
-class Path(val step: PathStep, val previous: Path?, var nexts: List<Path> = emptyList()) {
-    fun searchTheEnd(visited: Set<Field>): Boolean {
-        return if (map[step.field.y][step.field.x] == 'E') {
-            if (shortest > step.score) {
-                shortest = step.score
-            }
-            pathCounter++
-            print("\b".repeat(pathCounter.toString().length))
-            print(pathCounter)
-            true
-        } else if (visited.contains(step.field) || step.score > shortest) {
-            false
-        } else {
-            val nextSteps = step.nextSteps().filter { it.field != previous?.step?.field }.filterNot { visited.contains(it.field)}
-            if (nextSteps.isEmpty()) {
-                false
-            } else {
-                val pathsToEnd = nextSteps.map { Path(it, this, emptyList()) }.filter { it.searchTheEnd(visited + step.field) }
-                nexts = pathsToEnd
-                return pathsToEnd.isNotEmpty()
-            }
-        }
-    }
-
-    fun findLeaves(): List<Path> {
-        return if(nexts.isEmpty()) {
-            listOf(this)
-        } else {
-            nexts.flatMap { it.findLeaves() }
-        }
-    }
-
-    fun visitedFields(): List<Field> {
-        return if (this.previous == null) {
-            listOf(this.step.field)
-        } else {
-            listOf(this.step.field) + previous.visitedFields()
-        }
+        val nexts = field.reachable().filterNot { visited.contains(field) }
+        return nexts.map { PathStep(it.second, it.first, score + direction.turnScore(it.first)+1L, visited + this.field) }
     }
 }
 
@@ -134,24 +92,28 @@ for (y in map.indices) {
     }
 }
 
-val firstStep = PathStep(start!!, Direction.EAST, 0L)
-val path = Path(firstStep, null)
+val firstStep = PathStep(start!!, Direction.EAST, 0L, emptySet())
+val finalSteps = mutableListOf<PathStep>()
+var currentShortest = Long.MAX_VALUE
+val lowestVisitedScores = mutableMapOf<Pair<Field, Direction>, Long>()
+var currentSteps = listOf(firstStep)
+while (currentSteps.isNotEmpty()) {
+    currentSteps = currentSteps.flatMap { step ->
+        val nextSteps = if (map[step.field.y][step.field.x] == 'E') {
+            finalSteps.add(step)
+            currentShortest = min(step.score, currentShortest)
+            println("found solution length ${step.score}")
+            listOf(null)
+        } else if (step.score > (lowestVisitedScores[step.field to step.direction] ?: Long.MAX_VALUE)) {
+            listOf(null)
+        } else {
+            step.nextSteps()
+        }
+        lowestVisitedScores.compute(step.field to step.direction) {_, v -> min(v ?: Long.MAX_VALUE, step.score)}
+        nextSteps.filterNotNull()
+    }
+}
 
-path.searchTheEnd(emptySet())
-println("\n*****")
-val pathLeaves = path.findLeaves().sortedBy { it.step.score }
-val shortestPath = pathLeaves.first()
-println("Shortest path score: ${shortestPath.step.score}")
-
-val shortestPaths = pathLeaves.filter { it.step.score== shortestPath.step.score }
-println(shortestPaths.size)
-val visitedFields = shortestPaths.flatMap { it.visitedFields() }.toSet()
-println("Tiles on best paths ${visitedFields.size}")
-
-
-
-
-
-
-
-
+println("Shortest path $currentShortest")
+val visitedFields = finalSteps.filter { it.score == currentShortest }.flatMap { it.visited }.toSet().size + 1
+println("Visited fields $visitedFields")
