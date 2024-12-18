@@ -117,53 +117,29 @@ println(cpuState.output.joinToString(","))
 
 var partialResult = 0.toBigInteger()
 
-for (i in 1..program.size) {
-    val wantedOutput = program.subList(0, i)
+// as the program shifts a to the right by 3 bits on each loop and has to be 0 at the end of the program,
+// we're looking for program.size * 3 bits here
+// strategy here is, we try finding the last output first by shifting our search value to the left the
+// needed number of bits. Once found, we try finding the last two outputs by using the value from the previous
+// run and try the next 3 lower bits, and so on until we found the full input.
+for (i in program.lastIndex downTo 0) {
+    val wantedOutput = program.subList(i, program.size)
     var found = false
     var a = 0.toBigInteger()
     while (!found) {
-//        println(a)
-        val startA = (a shl ((i - 1) * 3)) or partialResult
-//        println("$a ${startA.toString(2)}")
+        val startA = (a shl (i * 3)) + partialResult
         cpuState = CPUState(startA, startB, startC, 0, emptyList())
-        val reachedStates = mutableSetOf(cpuState)
         while (cpuState.pc < program.lastIndex) {
             val operation = forOpcode(program[cpuState.pc])
             val operand = program[cpuState.pc + 1]
             cpuState = operation.execute(cpuState, operand)
-            if (reachedStates.contains(cpuState.copy(output = emptyList()))) {
-                // endless loop
-//                println("endless?")
-                break
-            }
-            reachedStates.add(cpuState.copy(output = emptyList()))
-            val currentOutput = cpuState.output
-            if (currentOutput.isNotEmpty()) {
-                if (currentOutput.size > wantedOutput.size) {
-//                    println("too long")
-                    break
-                } else if (currentOutput.size < wantedOutput.size && currentOutput != wantedOutput.subList(
-                        0,
-                        currentOutput.size
-                    )
-                ) {
-//                    println("wrong output $currentOutput")
-                    break
-                } else if (currentOutput.size == wantedOutput.size) {
-                    if (currentOutput == wantedOutput) {
-                        partialResult = (a shl ((i - 1) * 3)) or partialResult
-//                        println("found $currentOutput with a=$a")
-                        found = true
-                        break
-                    } else {
-//                        println("wrong output $currentOutput")
-                        break
-                    }
-                }
-            }
+        }
+        if (cpuState.output.size == program.size && cpuState.output.subList(i, program.size) == wantedOutput) {
+            found = true
+            partialResult = (a shl (i * 3)) + partialResult
         }
         a = a.inc()
     }
-    println("found $i output digits")
+    println("found ${program.size - i} output digits")
 }
 println("\nProgram duplicates at $partialResult")
